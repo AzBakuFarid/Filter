@@ -1,4 +1,4 @@
-﻿using CustomDataFilter.Models;
+using CustomDataFilter.Models;
 using System;
 using System.Collections.Generic;
 using System.IO;
@@ -24,25 +24,26 @@ namespace CustomDataFilter.Controllers
                 // yoxla gorek data hansi fayla yazilacaq
                 var filename = _data.CheckData();
                 // datanin yazilacagi faylin full path gotur
-                var filepath = Path.Combine(Server.MapPath("/Files"), filename);    
-                //eger datanin yazilacagi fayl yoxdusa yarat
-                if (!System.IO.File.Exists(filepath))
-                {
-
-                    FileStream fs = null;
-                    try
-                    {
-                        fs = System.IO.File.Create(filepath);
-                    }
-                    finally
-                    {
-                        fs.Close();
-                    }
-                }
-                //datani fayla yazmaq ucun funksiyani ise sal
+                var filepath = Path.Combine(Server.MapPath("/Files"), filename);
+                
+                //datanin fayla yazilma ani :)
                 using (StreamWriter w = System.IO.File.AppendText(filepath))
                 {
-                    Log(_data, w);
+                    // data fayla yazilan anda yuz faiz movcud olacaq
+                    // amma nezeri olaraq using statementde fayl yarandiqdan sonra Log() method ise dusene qeder faylin 
+                    // FTP servere kocurulmesi ile elaqader silinmesi hali ola biler
+                    
+                    try
+                    {
+                        Log(_data, w);
+                    }
+                    catch (FileNotFoundException e)
+                    {
+                        FileStream fs = System.IO.File.Create(filepath);
+                        fs.Close();
+                        Log(_data, w);
+                        //var mes = e.Message;
+                    }
                 }
             }
             return View("Index");
