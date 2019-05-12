@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -8,6 +8,7 @@ using System.Net;
 using System.IO;
 using System.Text;
 using System.Timers;
+using System.Threading.Tasks;
 
 namespace CustomDataFilter.Models
 {
@@ -40,7 +41,7 @@ namespace CustomDataFilter.Models
         // bu funksiya Global.asax-da cagirilir
         public static void RegisterFtpFileUploading()
         {
-            Timer timer = new Timer(60000);
+            Timer timer = new Timer(15*60000);
             timer.Elapsed += SendFileCallback;
             timer.AutoReset = true;
             timer.Enabled = true;
@@ -54,21 +55,21 @@ namespace CustomDataFilter.Models
             var path = AppDomain.CurrentDomain.BaseDirectory + "Files"; //appserverde fayllarin oxunacagi folderin adi
             DirectoryInfo d = new DirectoryInfo(path);
             FileInfo[] Files = d.GetFiles(); //appserverde FTP servere gonderilecek fayllari gotur
-            // FTP servere gonderilecek fayllar mueyyen olunandan sonra her bir fayl onun ucun
-            // ayrilmis wrapper class-a yigilir 
-            foreach (ContentWrapper item in prepareContentWrapper(Files))
-            {
-                // gonderilecek fayllara uygun wrapper classlarin uzerinde 
-                // UploadToFTPServer() extension method tetbiq olunur
-                using (FtpWebResponse result = item.UploadToFTPServer())
-                {
-                    // eger fayl FTP servere ugurla gonderildise appserverden sil
-                    if (result.StatusDescription.IndexOf("Successfully transferred") > 0)
+            // kocurulecek fayl varsa ana task yarat ve hemin taskin icinde fayllarin sayina uygun
+            // child tasklar yarat. hemin child tasklarda file FTP servere asinxron gonderilsin ve her biri uzre ugurla basha 
+            // catibsa gonderilen fayl appserverden silinsin
+            if (Files.Length > 0) {
+                Task parentTask = new Task(()=> {
+                    var tf = new TaskFactory(TaskCreationOptions.AttachedToParent, TaskContinuationOptions.ExecuteSynchronously);
+                    var childTasks = new List<Task>();
+                    foreach (ContentWrapper item in prepareContentWrapper(Files))
                     {
-                        File.Delete(item.file.FullName);
+                        childTasks.Add(tf.StartNew(()=> { item.UploadToFTPServer();}).
+                            ContinueWith((task)=> { File.Delete(item.file.FullName); }, TaskContinuationOptions.OnlyOnRanToCompletion));
                     }
-                }
-
+                }) ;
+                parentTask.Start();
+                parentTask.Wait();
             }
         }
 
@@ -80,7 +81,7 @@ namespace CustomDataFilter.Models
                 ContentWrapper cw = new ContentWrapper();
                 cw.file = item;
                 cw.FtpFoldername = Path.GetFileNameWithoutExtension(item.FullName);
-                cw.FtpRequest = (FtpWebRequest)WebRequest.Create($"{ConfigurationManager.AppSettings["ftpserver"]}/{cw.FtpFoldername}/{DateTime.Now.ToString("dd-mm-yyyy_hh-mm-ss")}.txt");
+                cw.FtpRequest = (FtpWebRequest)WebRequest.Create($"{ConfigurationManager.AppSettings["ftpserver"]}/{cw.FtpFoldername}/{DateTime.Now.ToString("dd-MM-yyyy_hh-mm-ss")}.txt");
                 cw.FtpRequest.Credentials = new NetworkCredential(ConfigurationManager.AppSettings["ftpusername"], ConfigurationManager.AppSettings["ftppassword"]);
                 cw.FtpRequest.Method = WebRequestMethods.Ftp.UploadFile;
 
@@ -108,3 +109,4 @@ namespace CustomDataFilter.Models
 
     }
 }
+
