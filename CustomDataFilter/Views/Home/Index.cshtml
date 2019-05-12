@@ -1,0 +1,24 @@
+﻿@{
+    ViewBag.Title = "Home Page";
+}
+
+<div class="jumbotron">
+    <h1>Data Filter Application</h1>
+    <p>Type your data below and send to server</p>
+    
+</div>
+
+<div class="row">
+    <div class="col-md-4">
+        
+        @using (Html.BeginForm("GetData", "Home", FormMethod.Post)) {
+
+        <input type="text" name="_data" value="" class="form-control" placeholder="enter the data...." />
+        <br />
+        <button class="btn btn-primary" type="submit"> S e n d  </button>
+        }
+
+
+    </div>
+  
+</div>
